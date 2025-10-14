@@ -71,22 +71,46 @@ export class AuthAPI {
  */
 export class DeviceAPI {
   /**
-   * Register a device
+   * Register a device in the database
    */
-  static async registerDevice(
-    deviceName: string
-  ): Promise<DeviceRegisterResponse> {
-    const session = await AuthAPI.getSession();
-    if (!session?.access_token) {
-      throw new Error('Not authenticated');
-    }
+  static async registerDevice(deviceName: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
 
-    const { data, error } = await supabase.functions.invoke('device-register', {
-      body: { device_name: deviceName } as DeviceRegisterRequest
-    });
+    // Generate unique device ID
+    const deviceId = `WELILE-${Math.random().toString(36).substr(2, 9)}-${Date.now()}`;
+    const apiToken = `TOKEN-${Math.random().toString(36).substr(2, 16)}`;
+
+    const { error } = await supabase
+      .from('devices')
+      .insert({
+        user_id: user.id,
+        device_id: deviceId,
+        device_name: deviceName,
+        api_token: apiToken
+      });
 
     if (error) throw error;
-    return data as DeviceRegisterResponse;
+
+    return {
+      status: 'registered',
+      message: 'Device linked successfully',
+      device_id: deviceId,
+      api_token: apiToken
+    };
+  }
+
+  /**
+   * Get user's devices
+   */
+  static async getDevices() {
+    const { data, error } = await supabase
+      .from('devices')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
   }
 }
 
@@ -95,33 +119,38 @@ export class DeviceAPI {
  */
 export class SmsAPI {
   /**
-   * Sync an SMS transaction to the backend
+   * Sync an SMS transaction to the database
    */
-  static async syncSms(request: SmsSyncRequest): Promise<SmsSyncResponse> {
-    const session = await AuthAPI.getSession();
-    if (!session?.access_token) {
-      throw new Error('Not authenticated');
-    }
+  static async syncSms(request: SmsSyncRequest) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
 
-    const { data, error } = await supabase.functions.invoke('sms-sync', {
-      body: request
-    });
+    const { error } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: user.id,
+        device_id: request.device_id,
+        sender: request.sender,
+        message: request.message,
+        amount: request.amount,
+        type: request.type,
+        network: request.network,
+        reference: request.reference,
+        timestamp: request.timestamp
+      });
 
     if (error) throw error;
-    return data as SmsSyncResponse;
+
+    return {
+      status: 'success',
+      message: 'SMS synced and saved'
+    };
   }
 
   /**
    * Get all transactions for the current user
    */
   static async getTransactions() {
-    const session = await AuthAPI.getSession();
-    if (!session?.access_token) {
-      throw new Error('Not authenticated');
-    }
-
-    // This would query the transactions table
-    // Adjust table name and columns based on your schema
     const { data, error } = await supabase
       .from('transactions')
       .select('*')

@@ -9,40 +9,18 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useSmsSync } from "@/hooks/useSmsSync";
 import { StorageHelper } from "@/lib/api";
-import { Transaction } from "@/types/transaction";
+import { useTransactions } from "@/hooks/useTransactions";
+
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, signOut, loading } = useAuth();
   const { syncSms, registerDevice, isSyncing } = useSmsSync();
+  const { transactions, loading: transactionsLoading, refresh: refreshTransactions } = useTransactions();
   
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [testSmsMessage, setTestSmsMessage] = useState("");
   const [showTestSms, setShowTestSms] = useState(false);
   const [deviceRegistered, setDeviceRegistered] = useState(false);
-  
-  const [transactions] = useState<Transaction[]>([
-    {
-      id: "1",
-      type: "Cash In",
-      amount: 150000,
-      network: "MTN",
-      sender: "John Okello",
-      reference: "MTN123456",
-      timestamp: "2025-10-13T14:05:00Z",
-      message: "You have received UGX 150,000 from John Okello. Ref: MTN123456"
-    },
-    {
-      id: "2",
-      type: "Cash Out",
-      amount: 50000,
-      network: "AIRTEL",
-      sender: "Jane Auma",
-      reference: "AT789012",
-      timestamp: "2025-10-13T12:30:00Z",
-      message: "You have sent UGX 50,000 to Jane Auma. Txn: AT789012"
-    }
-  ]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -81,12 +59,8 @@ const Dashboard = () => {
 
   const balance = totalCashIn - totalCashOut;
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      toast.success("Transactions synced");
-    }, 1500);
+  const handleRefresh = async () => {
+    await refreshTransactions();
   };
 
   const handleTestSms = async () => {
@@ -125,12 +99,12 @@ const Dashboard = () => {
     return `${diffDays}d ago`;
   };
 
-  if (loading) {
+  if (loading || transactionsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center">
         <div className="text-center">
           <Wallet className="w-16 h-16 text-primary mx-auto mb-4 animate-pulse" />
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">Loading your transactions...</p>
         </div>
       </div>
     );
@@ -182,10 +156,9 @@ const Dashboard = () => {
                 variant="ghost"
                 size="sm"
                 onClick={handleRefresh}
-                disabled={isRefreshing}
                 className="h-8"
               >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className="w-4 h-4" />
               </Button>
             </div>
             <div className="mb-6">
@@ -288,7 +261,18 @@ const Dashboard = () => {
           </Card>
         )}
 
-        <div className="space-y-3">
+        {transactions.length === 0 ? (
+          <Card className="border-0 shadow-sm bg-gradient-card">
+            <CardContent className="p-8 text-center">
+              <Smartphone className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="font-semibold mb-2">No transactions yet</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Test the SMS parser above to add your first transaction
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
           {transactions.map((transaction) => (
             <Card
               key={transaction.id}
@@ -342,7 +326,8 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           ))}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

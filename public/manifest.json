@@ -4,8 +4,8 @@
   "description": "Sync Mobile Money SMS transactions automatically",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f7fa",
-  "theme_color": "#0066cc",
+  "background_color": "#ffffff",
+  "theme_color": "#9333ea",
   "orientation": "portrait",
   "icons": [
     {

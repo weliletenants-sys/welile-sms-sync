@@ -1,22 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, TrendingUp, TrendingDown, Smartphone, Settings, LogOut, RefreshCw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Wallet, TrendingUp, TrendingDown, Smartphone, Settings, LogOut, RefreshCw, Send } from "lucide-react";
 import { toast } from "sonner";
-
-interface Transaction {
-  id: string;
-  type: "Cash In" | "Cash Out";
-  amount: number;
-  network: "MTN" | "AIRTEL";
-  sender: string;
-  reference: string;
-  timestamp: string;
-}
-
+import { useAuth } from "@/hooks/useAuth";
+import { useSmsSync } from "@/hooks/useSmsSync";
+import { DeviceAPI, StorageHelper } from "@/lib/api";
+import { Transaction } from "@/types/transaction";
 const Dashboard = () => {
+  const navigate = useNavigate();
+  const { user, signOut, loading } = useAuth();
+  const { syncSms, registerDevice, isSyncing } = useSmsSync();
+  
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [testSmsMessage, setTestSmsMessage] = useState("");
+  const [showTestSms, setShowTestSms] = useState(false);
+  const [deviceRegistered, setDeviceRegistered] = useState(false);
+  
   const [transactions] = useState<Transaction[]>([
     {
       id: "1",
@@ -25,7 +28,8 @@ const Dashboard = () => {
       network: "MTN",
       sender: "John Okello",
       reference: "MTN123456",
-      timestamp: "2025-10-13T14:05:00Z"
+      timestamp: "2025-10-13T14:05:00Z",
+      message: "You have received UGX 150,000 from John Okello. Ref: MTN123456"
     },
     {
       id: "2",
@@ -34,18 +38,37 @@ const Dashboard = () => {
       network: "AIRTEL",
       sender: "Jane Auma",
       reference: "AT789012",
-      timestamp: "2025-10-13T12:30:00Z"
-    },
-    {
-      id: "3",
-      type: "Cash In",
-      amount: 200000,
-      network: "MTN",
-      sender: "Peter Mwesigwa",
-      reference: "MTN654321",
-      timestamp: "2025-10-13T10:15:00Z"
+      timestamp: "2025-10-13T12:30:00Z",
+      message: "You have sent UGX 50,000 to Jane Auma. Txn: AT789012"
     }
   ]);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  useEffect(() => {
+    // Check if device is registered
+    const deviceId = StorageHelper.getDeviceId();
+    setDeviceRegistered(!!deviceId);
+  }, []);
+
+  const handleRegisterDevice = async () => {
+    try {
+      const deviceName = `${navigator.userAgent.split('(')[1]?.split(')')[0] || 'Unknown Device'}`;
+      await registerDevice(deviceName);
+      setDeviceRegistered(true);
+    } catch (error) {
+      console.error('Device registration failed:', error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth");
+  };
 
   const totalCashIn = transactions
     .filter(t => t.type === "Cash In")
@@ -63,6 +86,21 @@ const Dashboard = () => {
       setIsRefreshing(false);
       toast.success("Transactions synced");
     }, 1500);
+  };
+
+  const handleTestSms = async () => {
+    if (!testSmsMessage.trim()) {
+      toast.error("Please enter an SMS message to test");
+      return;
+    }
+
+    try {
+      await syncSms("MTN Mobile Money", testSmsMessage);
+      setTestSmsMessage("");
+      setShowTestSms(false);
+    } catch (error) {
+      console.error("Test SMS failed:", error);
+    }
   };
 
   const formatAmount = (amount: number) => {
@@ -86,6 +124,17 @@ const Dashboard = () => {
     return `${diffDays}d ago`;
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center">
+        <div className="text-center">
+          <Wallet className="w-16 h-16 text-primary mx-auto mb-4 animate-pulse" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
       {/* Header */}
@@ -98,7 +147,7 @@ const Dashboard = () => {
               </div>
               <div>
                 <h1 className="text-xl font-bold">Welile SMS</h1>
-                <p className="text-sm text-primary-foreground/80">+256 700 123 456</p>
+                <p className="text-sm text-primary-foreground/80">{user?.email}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -112,6 +161,7 @@ const Dashboard = () => {
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={handleSignOut}
                 className="text-primary-foreground hover:bg-white/20"
               >
                 <LogOut className="w-5 h-5" />
@@ -173,11 +223,69 @@ const Dashboard = () => {
       <div className="max-w-2xl mx-auto px-4 pb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Recent Transactions</h2>
-          <Badge variant="secondary" className="rounded-full">
-            <Smartphone className="w-3 h-3 mr-1" />
-            SMS Synced
-          </Badge>
+          <div className="flex gap-2">
+            {!deviceRegistered && (
+              <Button
+                onClick={handleRegisterDevice}
+                size="sm"
+                variant="outline"
+                className="rounded-full"
+              >
+                <Smartphone className="w-3 h-3 mr-1" />
+                Register Device
+              </Button>
+            )}
+            {deviceRegistered && (
+              <Badge variant="secondary" className="rounded-full">
+                <Smartphone className="w-3 h-3 mr-1" />
+                Device Registered
+              </Badge>
+            )}
+          </div>
         </div>
+
+        {/* Test SMS Input */}
+        {deviceRegistered && (
+          <Card className="border-0 shadow-sm bg-gradient-card mb-4">
+            <CardContent className="p-4">
+              <Button
+                onClick={() => setShowTestSms(!showTestSms)}
+                variant="outline"
+                size="sm"
+                className="w-full mb-2"
+              >
+                {showTestSms ? "Hide" : "Test"} SMS Parser
+              </Button>
+              
+              {showTestSms && (
+                <div className="space-y-2 mt-2">
+                  <Input
+                    placeholder="Paste MTN/Airtel SMS here..."
+                    value={testSmsMessage}
+                    onChange={(e) => setTestSmsMessage(e.target.value)}
+                    className="text-sm"
+                  />
+                  <Button
+                    onClick={handleTestSms}
+                    disabled={isSyncing}
+                    size="sm"
+                    className="w-full bg-gradient-primary"
+                  >
+                    {isSyncing ? "Syncing..." : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Sync Test SMS
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Example: "You have received UGX 150,000 from John. Ref: MTN123"
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="space-y-3">
           {transactions.map((transaction) => (

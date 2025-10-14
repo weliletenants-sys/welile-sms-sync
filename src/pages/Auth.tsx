@@ -1,32 +1,80 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Smartphone, ArrowRight, Wallet } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Auth = () => {
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { signIn, signUp, user } = useAuth();
 
-  const handleSendOTP = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
+
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!phoneNumber.match(/^(\+256|0)?[37]\d{8}$/)) {
-      toast.error("Please enter a valid Ugandan phone number");
+    if (!email || !password) {
+      toast.error("Please fill in all fields");
       return;
     }
 
     setIsLoading(true);
     
-    // Simulate OTP send
-    setTimeout(() => {
+    try {
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        toast.error(error.message || "Sign in failed");
+      } else {
+        toast.success("Signed in successfully!");
+        navigate("/dashboard");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "An error occurred");
+    } finally {
       setIsLoading(false);
-      toast.success("OTP sent to " + phoneNumber);
-      navigate("/verify-otp", { state: { phoneNumber } });
-    }, 1500);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email || !password) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      const { error } = await signUp(email, password);
+      
+      if (error) {
+        toast.error(error.message || "Sign up failed");
+      } else {
+        toast.success("Account created! Please check your email for verification.");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -48,45 +96,97 @@ const Auth = () => {
         {/* Auth Card */}
         <Card className="border-0 shadow-lg bg-gradient-card">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl">Sign in with phone</CardTitle>
+            <CardTitle className="text-2xl">Welcome back</CardTitle>
             <CardDescription>
-              Enter your phone number to receive a verification code
+              Sign in to access your Mobile Money dashboard
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSendOTP} className="space-y-4">
-              <div className="space-y-2">
-                <div className="relative">
-                  <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    type="tel"
-                    placeholder="+256 700 123 456"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="pl-11 h-12 text-base"
-                    required
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  We'll send you a 6-digit verification code
-                </p>
-              </div>
+            <Tabs defaultValue="signin" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="signin">Sign In</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="signin">
+                <form onSubmit={handleSignIn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Input
+                      type="email"
+                      placeholder="Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="h-12"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Input
+                      type="password"
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="h-12"
+                      required
+                    />
+                  </div>
 
-              <Button
-                type="submit"
-                className="w-full h-12 text-base bg-gradient-primary hover:opacity-90 transition-opacity"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  "Sending..."
-                ) : (
-                  <>
-                    Continue
-                    <ArrowRight className="ml-2 w-5 h-5" />
-                  </>
-                )}
-              </Button>
-            </form>
+                  <Button
+                    type="submit"
+                    className="w-full h-12 text-base bg-gradient-primary hover:opacity-90 transition-opacity"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Signing in..." : (
+                      <>
+                        Sign In
+                        <ArrowRight className="ml-2 w-5 h-5" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="signup">
+                <form onSubmit={handleSignUp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Input
+                      type="email"
+                      placeholder="Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="h-12"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Input
+                      type="password"
+                      placeholder="Password (min. 6 characters)"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="h-12"
+                      required
+                      minLength={6}
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full h-12 text-base bg-gradient-primary hover:opacity-90 transition-opacity"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Creating account..." : (
+                      <>
+                        Create Account
+                        <ArrowRight className="ml-2 w-5 h-5" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
 
             <div className="mt-6 pt-6 border-t border-border">
               <p className="text-xs text-center text-muted-foreground">

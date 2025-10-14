@@ -8,8 +8,9 @@ import { Wallet, TrendingUp, TrendingDown, Smartphone, Settings, LogOut, Refresh
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useSmsSync } from "@/hooks/useSmsSync";
-import { DeviceAPI, StorageHelper } from "@/lib/api";
+import { StorageHelper } from "@/lib/api";
 import { Transaction } from "@/types/transaction";
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, signOut, loading } = useAuth();

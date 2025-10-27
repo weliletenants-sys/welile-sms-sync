@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SmsParser } from '@/lib/smsParser';
 import { SmsAPI, DeviceAPI, StorageHelper } from '@/lib/api';
 import { SmsSyncRequest } from '@/types/transaction';
@@ -6,6 +6,28 @@ import { toast } from 'sonner';
 
 export function useSmsSync() {
   const [isSyncing, setIsSyncing] = useState(false);
+
+  /**
+   * Listen for SMS from native Android
+   */
+  useEffect(() => {
+    const handleNativeSms = (event: CustomEvent) => {
+      const { sender, message } = event.detail;
+      console.log('📱 Received SMS from Android:', sender, message);
+      
+      // Show notification
+      toast.success(`SMS received from ${sender}`);
+      
+      // Automatically sync the SMS
+      syncSms(sender, message);
+    };
+
+    window.addEventListener('smsReceived', handleNativeSms as EventListener);
+
+    return () => {
+      window.removeEventListener('smsReceived', handleNativeSms as EventListener);
+    };
+  }, []);
 
   /**
    * Register the current device

@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Welile SMS',
   webDir: 'dist',
   server: {
-    url: 'https://welilereceipts.com',
+    url: 'https://welilereceipts.com?forceHideBadge=true',
     cleartext: true
   },
   plugins: {
